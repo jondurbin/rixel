@@ -79,6 +79,11 @@ class Rixel::Image
   # Find a variant.
   def variant(options)
     return self if options.empty?
+    mismatch = false
+    options.each do |k, v|
+      mismatch = true and break if self[k] != v
+    end
+    return self unless mismatch
     Rixel::Image.where({parent_id: id}.merge(options)).first
   end
 
