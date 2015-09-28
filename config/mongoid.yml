@@ -1,0 +1,13 @@
+development:
+  clients:
+    default:
+      database: rixel_development
+      hosts: 
+        - localhost:27017
+
+production:
+  clients:
+    default:
+      database: rixel_production
+      hosts:
+        - localhost:27017

@@ -1,0 +1,11 @@
+storage:
+  s3:
+    path: /tmp
+    bucket: BUCKET_NAME
+    access_key_id: ACCESS_KEY_ID
+    secret_access_key: ACCESS_KEY_ID
+    region: us-east-1
+cache:
+  max_size: 40g
+  path: /cache
+url: /images/:id
