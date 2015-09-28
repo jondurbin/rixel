@@ -12,6 +12,7 @@ require 'open-uri'
 # Rixel stuff.
 require_relative 'model/rixel'
 require_relative 'model/rixel/config'
+require_relative 'model/rixel/s3_interface'
 require_relative 'model/rixel/image'
 require_relative 'model/rixel/image/file'
 require_relative 'model/rixel/image/face'
@@ -43,15 +44,15 @@ RixelServer = Cuba.define do
   # Get an image.
   on get do
     on image_endpoint do |id|
-      parent = Rixel::Image.where(_id: id).first
+      parent = Rixel::Image.load(id)
       on parent.nil? do
         res.status = 404
+        halt(res.finish)
       end
       image = parent.variant(options)
       if image.nil?
         image = parent.create_variant(options)
       end
-      res['Filename'] = image.filename
       send_file(Rixel::Image::File.open(image))
     end
     res.status = 404
@@ -62,23 +63,13 @@ RixelServer = Cuba.define do
     on 'image' do
       on param('file') do |image|
         on image[:tempfile].is_a?(Tempfile) do
-          path = image[:tempfile].path
-          geometry = Paperclip::Geometry.from_file(path) rescue nil
-          on geometry.nil? do
+          image = Rixel::Image.create(image[:tempfile].path) rescue nil
+          on image.nil? do
             res.status = 422
             res.write 'Invalid image'
             halt(res.finish)
           end
-
-          # Try to save the image.
-          image = Rixel::Image.new(
-            w: geometry.width,
-            h: geometry.height
-          )
-          image.image = File.open(path)
-          #image.find_faces(image[:tempfile])
-          image.save!
-          res.redirect(image.image.url)
+          res.write image.image.url
         end
       end
     end
@@ -87,8 +78,8 @@ RixelServer = Cuba.define do
   # Delete an image.
   on delete do
     on 'delete/:id' do |id|
-      image = Rixel::Image.variant(id, options)
-      image.destroy unless image.nil?
+      Rixel::Image.where({'$or' => [{_id: id}, {parent_id: id}]}).each {|image| image.destroy}
+      res.write 'ok'
     end
   end
 end

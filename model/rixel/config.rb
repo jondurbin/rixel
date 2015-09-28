@@ -30,7 +30,7 @@ class Rixel::Config
       options = symbolize_keys(YAML.load_file(path))
       configure_storage(options)
       unless local_storage?
-        configure_cache(options)
+        configure_cache(options[:storage])
       end
       @url = options[:url]
     end
@@ -85,7 +85,7 @@ class Rixel::Config
     # Configure s3 as the storage.
     def use_s3(options)
       @s3 = true
-      Paperclip::Attachment.default_options[:path] = '/images/:id'
+      Paperclip::Attachment.default_options[:path] = options[:path]
       Paperclip::Attachment.default_options[:bucket] = options[:bucket]
       Paperclip::Attachment.default_options[:storage] = :s3
       Paperclip::Attachment.default_options[:s3_credentials] = {

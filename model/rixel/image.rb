@@ -22,6 +22,7 @@ class Rixel::Image
   embeds_many :faces, class_name: 'Rixel::Image::Face'
 
   # Generate a shorter image ID.
+  field :skip_id_generation, type: Boolean, default: false
   before_create :generate_id
 
   # Attached image.
@@ -48,6 +49,7 @@ class Rixel::Image
 
   # Generate a unique, short(er) ID.
   def generate_id
+    return if skip_id_generation
     while self._id = SecureRandom.urlsafe_base64(ID_LENGTH)
       break unless Rixel::Image.where(_id: self._id).exists?
     end
@@ -104,8 +106,6 @@ class Rixel::Image
       starting_image.save!
     end
 
-puts "Generated this starting image: #{starting_image.inspect}"
-
     # Apply any further transforms.
     mismatch = false
     options.each do |k, v|
@@ -116,5 +116,39 @@ puts "Generated this starting image: #{starting_image.inspect}"
     final_image = Rixel::Image.new(options.merge(parent_id: id, image: starting_image.get_file))
     final_image.save!
     final_image
+  end
+
+  # Create a new image from a file path.
+  def self.create(path, id=nil)
+    geometry = Paperclip::Geometry.from_file(path) rescue nil
+    raise 'Invalid image' if geometry.nil?
+
+    # Try to save the image.
+    image_args = {
+      w: geometry.width,
+      h: geometry.height,
+      image: ::File.open(path)
+    }
+    image_args[:_id] = id unless id.nil?
+    image_args[:skip_id_generation] = true unless id.nil?
+    image = Rixel::Image.new(image_args)
+    #image.find_faces(image[:tempfile])
+    image.save!
+    image
+  end
+
+  class << self
+    # Load an image (either directly or from s3).
+    def load(id)
+      image = Rixel::Image.where(_id: id).first
+      return image unless image.nil?
+      return nil if Rixel::Config.local_storage?
+      return nil unless Rixel::S3Interface.exists?(id)
+      temp_path = Tempfile.new('rixel')
+      Rixel::S3Interface.download(id, temp_path)
+      image = Rixel::Image.create(temp_path, id)
+      File.unlink(temp_path)
+      image
+    end
   end
 end

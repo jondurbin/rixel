@@ -84,20 +84,9 @@ class Rixel::Image::File::Cache
     # Download an image.
     private
     def download(image, path)
-      $lock.synchronize do
-        s3_path = Paperclip::Attachment.default_options[:path].gsub(/^\//, '').gsub(':id', image.id)
-        region = Paperclip::Attachment.default_options[:region]
-        creds = Paperclip::Attachment.default_options[:s3_credentials]
-        AWS.config(access_key_id: creds[:access_key_id], secret_access_key: creds[:secret_access_key], region: region)
-        s3 = AWS::S3.new
-        bucket_name = Paperclip::Attachment.default_options[:bucket]
-puts "Trying to get #{s3_path} from #{region}"
-        File.open(path, 'wb') do |output|
-          output.write(s3.buckets[bucket_name].objects[s3_path].read)
-        end
-        @files[path] = {last_access: Time.now, size: File.size(path)}
-        Rixel::Image::File.open(path)
-      end
+      Rixel::S3Interface.download(image.id, path)
+      @files[path] = {last_access: Time.now, size: File.size(path)}
+      Rixel::Image::File.open(path)
     end
 
     # Delete one file.
