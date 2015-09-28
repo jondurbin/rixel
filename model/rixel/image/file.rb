@@ -5,7 +5,7 @@ class Rixel::Image::File < File
         super(image)
       else
         if Rixel::Config.local_storage?
-          super(image.image.file.path)
+          super(image.image.path)
         else
           Rixel::Image::File::Cache.get(image)
         end

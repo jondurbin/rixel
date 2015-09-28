@@ -49,7 +49,7 @@ RixelServer = Cuba.define do
       end
       image = parent.variant(options)
       if image.nil?
-        image = parent.convert(options)
+        image = parent.create_variant(options)
       end
       send_file(Rixel::Image::File.open(image))
     end

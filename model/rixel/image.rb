@@ -38,7 +38,7 @@ class Rixel::Image
   # Round convert options.
   def convert_options
     return '' unless round
-    "\\( -size #{width}x#{height} xc:none -fill white -draw 'circle #{(width / 2).to_i},#{(height / 2).to_i} #{(width / 2).to_i},0' \\) -compose copy_opacity -composite"
+    "\\( -size #{w}x#{h} xc:none -fill white -draw 'circle #{(w / 2).to_i},#{(h / 2).to_i} #{(w / 2).to_i},0' \\) -compose copy_opacity -composite"
   end
 
   # Generate a unique, short(er) ID.
@@ -50,8 +50,8 @@ class Rixel::Image
   end
 
   # Find faces.
-  def find_faces(file)
-    self.faces = Rixel::Image::Face.detect(file)
+  def find_faces(input_file=get_file)
+    self.faces = Rixel::Image::Face.detect(input_file)
   end
 
   # Parent image.
@@ -60,7 +60,7 @@ class Rixel::Image
   end
 
   # File.
-  def file
+  def get_file
     Rixel::Image::File.open(self)
   end
 
@@ -71,10 +71,10 @@ class Rixel::Image
   end
 
   # Convert the image to a new variant.
-  def convert(options)
+  def create_variant(options)
     existing = Rixel::Image.where({parent_id: id}.merge(options)).first
     return existing unless existing.nil?
-    options = options.merge(parent_id: id, image: self.file)
+    options = options.merge(parent_id: id, image: get_file)
     options[:w] ||= w
     options[:h] ||= h
     image = Rixel::Image.new(options)

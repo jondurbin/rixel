@@ -29,7 +29,9 @@ class Rixel::Config
     def parse(path)
       options = symbolize_keys(YAML.load_file(path))
       configure_storage(options)
-      configure_cache(options)
+      unless local_storage?
+        configure_cache(options)
+      end
       @url = options[:url]
     end
 
