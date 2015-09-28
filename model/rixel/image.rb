@@ -28,17 +28,22 @@ class Rixel::Image
   has_mongoid_attached_file(:image, {
     url: Rixel::Config.url,
     styles: lambda do |a|
-      return {} if a.instance.round
+      if a.instance.round
+        return {
+          original: {
+            convert_options: a.instance.round_style,
+            format: :png
+          }
+        }
+      end
       {original: "#{a.instance.w}x#{a.instance.h}#"}
-    end,
-    convert_options: { original: lambda {|image| image.convert_options} }
+    end
   })
   validates_attachment :image, content_type: { content_type: /\Aimage\/.+\Z/ }
 
   # Round convert options.
-  def convert_options
-    return '' unless round
-    "\\( -size #{w}x#{h} xc:none -fill white -draw 'circle #{(w / 2).to_i},#{(h / 2).to_i} #{(w / 2).to_i},0' \\) -compose copy_opacity -composite"
+  def round_style
+    "\\( -size #{w}x#{h} xc:none -fill white -draw 'circle #{(w / 2).to_i},#{(h / 2).to_i} #{(w/ 2).to_i},0' \\) -compose copy_opacity -composite"
   end
 
   # Generate a unique, short(er) ID.
@@ -72,13 +77,39 @@ class Rixel::Image
 
   # Convert the image to a new variant.
   def create_variant(options)
-    existing = Rixel::Image.where({parent_id: id}.merge(options)).first
-    return existing unless existing.nil?
-    options = options.merge(parent_id: id, image: get_file)
+    v = variant(options)
+    return v unless v.nil?
+
+    # Default is to copy the height and width.
     options[:w] ||= w
     options[:h] ||= h
-    image = Rixel::Image.new(options)
-    image.save!
-    image
+
+    # Same size?
+    if options[:w] == w and options[:h] == h
+      image = Rixel::Image.new(options.merge(parent_id: id, image: get_file))
+      image.save!
+      return image
+    end
+
+    # New size.
+    base_options = {parent_id: id, w: options[:w], h: options[:h]}
+    starting_image = Rixel::Image.where(base_options).first
+    if starting_image.nil?
+      starting_image = Rixel::Image.new(base_options.merge(image: get_file))
+      starting_image.save!
+    end
+
+puts "Generated this starting image: #{starting_image.inspect}"
+
+    # Apply any further transforms.
+    mismatch = false
+    options.each do |k, v|
+      mismatch = true and break if starting_image[k] != v
+    end
+    return starting_image unless mismatch
+
+    final_image = Rixel::Image.new(options.merge(parent_id: id, image: starting_image.get_file))
+    final_image.save!
+    final_image
   end
 end
