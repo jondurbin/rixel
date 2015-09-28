@@ -69,6 +69,11 @@ class Rixel::Image
     Rixel::Image::File.open(self)
   end
 
+  # Filename (for response header).
+  def filename
+    "#{id.to_s}.#{image_file_name.split('.').last}"
+  end
+
   # Find a variant.
   def variant(options)
     return self if options.empty?

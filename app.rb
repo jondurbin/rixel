@@ -51,6 +51,7 @@ RixelServer = Cuba.define do
       if image.nil?
         image = parent.create_variant(options)
       end
+      res['Filename'] = image.filename
       send_file(Rixel::Image::File.open(image))
     end
     res.status = 404
