@@ -22,6 +22,38 @@ Rixel is a ruby web-server which servers as an image proxy that can transform im
 bundle exec puma -e ENVIRONMENT -p PORT, for example:
 bundle exec puma -e production -p 80
 
+# Accessing the console
+```bash
+cd /path/to/rixel; MONGOID_ENV=production bundle exec irb -r ./app.rb
+```
+
+# Creating an image.
+## Via console:
+```ruby
+Rixel::Image.create_from_file('/path/to/image.jpg', 'image.jpg')
+```
+## Via curl:
+```bash
+curl -XPOST -f "file=@filename.jpg" http://RIXEL_HOST:PORT/image
+# This will spit out the *relative* to the image.
+```
+
+# Manipulating the images.
+```
+http://RIXEL_HOST/images/image_id.jpg?PARAMS
+```
+# Examples:
+## Resizing: GET /images/test.jpg?w=300&h=300
+![/images/test.jpg?w=300&h=300](https://github.com/jondurbin/rixel/raw/master/examples/resize.jpg)
+## Resize and circle overlay: GET /images/test.jpg?w=300&h=300&round=true
+![/images/test.jpg?w=300&h=300&round=true](https://github.com/jondurbin/rixel/raw/master/examples/resize_round.png)
+## Resize and offset: GET /images/test.jpg?w=300&h=300&x=50&y=50
+![/images/test.jpg?w=300&h=300&x=50&y=50](https://github.com/jondurbin/rixel/raw/master/examples/resize_offset.jpg)
+## Resize, offset and crop: GET /images/test.jpg?w=300&h=300&x=50&y=50&crop_x=50&crop_y=50
+![/images/test.jpg?w=300&h=300&x=50&y=50&crop_x=50&crop_y=50](https://github.com/jondurbin/rixel/raw/master/examples/resize_offset_crop.jpg)
+## Resize, offset, crop and circle overlay: GET /images/test.jpg?w=300&h=300&x=50&y=50&crop_x=50&crop_y=50&round=true
+![/images/test.jpg?w=300&h=300&x=50&y=50&crop_x=50&crop_y=50&round=true](https://github.com/jondurbin/rixel/raw/master/examples/resize_offset_crop_round.jpg)
+
 ## Contributing
 Typical github contribution, I'm sure you can figure it out.
 
