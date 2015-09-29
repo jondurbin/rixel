@@ -85,7 +85,7 @@ class Rixel::Image
   def send_to_s3
     return unless Rixel::Config.s3?
     return unless parent_id.nil?
-    Rixel::S3Interface.put(self, image.queued_for_write[:original]) #.read)
+    Rixel::S3Interface.put(self, image.queued_for_write[:original])
   end
 
   # Delete the image from S3.
