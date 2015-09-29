@@ -1,8 +1,8 @@
 # rixel
-Rixel - ruby web-server for on-the-fly image resizing, shaping, cropping and face recognition.
+Rixel - ruby web-server for on-the-fly image resizing, shaping and cropping.
 
 # Rixel
-Rixel is a ruby web-server which servers as an image proxy that can transform images on-the-fly based on URL parameters.  Rixel supports local disk storage as well as AWS S3.  When using S3, rixel uses LRU disk caching, with configurable values for maximum cache files, total cache size, or max age of the file.
+Rixel is a ruby web-server which servers as an image proxy that can transform images on-the-fly based on URL parameters.  Rixel supports local disk storage as well as AWS S3.  When using S3, rixel uses LRU disk caching, with configurable values for maximum cache files and total cache size.
 
 ## Installation
 
