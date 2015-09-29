@@ -275,7 +275,6 @@ class Rixel::Image
         puts "Error saving image: #{e}, cleaning up..."
         rv = image.destroy rescue nil
       end
-      image.save!
       image
     end
 
