@@ -18,6 +18,29 @@ Rixel is a ruby web-server which servers as an image proxy that can transform im
 4. Install gems used by pixel with bundler: bundle
 5. *To support face recognition (coming soon) and automatic face cropping, you must install opencv 2.4.11 (opencv 3.* doesn't play nicely with the ruby-opencv gem in my experience).
 
+### Rixel config
+```yaml
+production:
+  url: /images/:id
+  storage:
+    path: /path/to/local/rixel/storage
+    s3:
+      s3_credentials:
+        access_key_id: AWS_ACCESS_KEY_ID
+        secret_access_key: AWS_SECRET_ACCESS_KEY
+      bucket_name: AWS_BUCKET_NAME
+      path: /images/:id
+      cache:
+        max_files: 1000
+        max_size: 1g
+```
+#### Description
+1. url: The path used for serving images, e.g. /path/to/image/:id
+2. storage: Storage configuration
+3. storage.path: Path to local storage (serves as cache directory when using S3)
+4. storage.s3: AWS S3 configuration
+5. storage.s3.cache: Configure how many files and/or max size of the local cache directory.
+
 ## Running the server
 bundle exec puma -e ENVIRONMENT -p PORT, for example:
 bundle exec puma -e production -p 80
