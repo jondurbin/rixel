@@ -42,8 +42,31 @@ production:
 5. storage.s3.cache: Configure how many files and/or max size of the local cache directory.
 
 ## Running the server
+```bash
 bundle exec puma -e ENVIRONMENT -p PORT, for example:
 bundle exec puma -e production -p 80
+```
+### Recommended usage:
+Run rixel as a unix socket daemon:
+```bash
+bundle exec puma -e production -b unix:///path/to/rixel.sock --daemon
+```
+Use nginx or some other webserver to reverse proxy requests to your image endpoint to rixel:
+```bash
+  upstream rixel {
+    server unix:///path/to/rixel.sock;
+  }
+  ...
+  location /images {
+    proxy_pass http://rixel;
+    proxy_set_header Host $host;
+    proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+    proxy_redirect off;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+```
 
 # Accessing the console
 ```bash
