@@ -179,6 +179,7 @@ class Rixel::Image
         raise "Invalid y value"
       end
     end
+    options[:round] ||= round
     options
   end
 
@@ -209,8 +210,6 @@ class Rixel::Image
     # Does the variant exist?
     existing = variant(options)
     unless existing.nil?
-      puts "Found this one: #{existing.inspect}"
-      puts "Options: #{options.inspect}"
       return existing
     end
 
@@ -227,13 +226,14 @@ class Rixel::Image
       if variation.nil?
         variation = Rixel::Image.new(full_args)
         variation.image = previous_variation.get_file
+        puts "Created this variant: #{variation.inspect}"
         variation.save!
       else
         puts "Found this variant: #{variation.inspect}"
       end
       previous_variation = variation
     end
-    if options[:round]
+    image = if options[:round]
       # Create the square version of the image.
       width = options[:w] - options[:x] - options[:crop_x]
       height = options[:h] - options[:y] - options[:crop_x]
@@ -241,16 +241,17 @@ class Rixel::Image
       step_args = {w: small, h: small, parent_id: parent_id}
       variation = Rixel::Image.where(step_args).first
       if variation.nil?
-        variation = Rixel::Image.new(w: small, h: small, parent_id: parent_id, image: previous_variation.get_file)
+        variation = Rixel::Image.new(w: small, h: small, parent_id: id, image: previous_variation.get_file)
         variation.save!
       end
-      final_image = Rixel::Image.new(w: small, h: small, parent_id: parent_id, image: variation.get_file)
+      final_image = Rixel::Image.new(w: small, h: small, parent_id: id, round: true, image: variation.get_file)
       final_image.save!
       final_image.update_attributes!(options)
-      puts "This is the final image: #{final_image.inspect}"
-      previous_variation = final_image
+      final_image
+    else
+      previous_variation
     end
-    previous_variation
+    image
   end
 
   # Class methods.
@@ -282,6 +283,7 @@ class Rixel::Image
       image = Rixel::Image.where(_id: id).first
       unless image.nil?
         if File.exists?(image.image.path)
+          image.update_attributes!(updated_at: Time.now)
           return image
         else
           image.destroy
