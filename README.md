@@ -34,14 +34,16 @@ Rixel::Image.create_from_file('/path/to/image.jpg', 'image.jpg')
 ```
 ## Via curl:
 ```bash
-curl -XPOST -f "file=@filename.jpg" http://RIXEL_HOST:PORT/image
+curl -XPOST -f "file=@filename.jpg" http://RIXEL_HOST/image
 # This will spit out the *relative* to the image.
 ```
+### To disable image uploads via post, edit app.rb, change the `on post` method to:
+```ruby
+on post do
+  res.status = 403
+end
+```
 
-# Manipulating the images.
-```
-http://RIXEL_HOST/images/image_id.jpg?PARAMS
-```
 # Examples:
 ## Resizing: GET /images/test.jpg?w=300&h=300
 ![/images/test.jpg?w=300&h=300](https://github.com/jondurbin/rixel/raw/master/examples/resize.jpg)
@@ -53,6 +55,17 @@ http://RIXEL_HOST/images/image_id.jpg?PARAMS
 ![/images/test.jpg?w=300&h=300&x=50&y=50&crop_x=50&crop_y=50](https://github.com/jondurbin/rixel/raw/master/examples/resize_offset_crop.jpg)
 ## Resize, offset, crop and circle overlay: GET /images/test.jpg?w=300&h=300&x=50&y=50&crop_x=50&crop_y=50&round=true
 ![/images/test.jpg?w=300&h=300&x=50&y=50&crop_x=50&crop_y=50&round=true](https://github.com/jondurbin/rixel/raw/master/examples/resize_offset_crop_round.jpg)
+
+# Deleting an image.
+```bash
+curl -XDELETE htp://RIXEL_HOST/images/:id
+```
+## To disable deleting images:
+```ruby
+on delete do
+  res.status = 403
+end
+```
 
 ## Contributing
 Typical github contribution, I'm sure you can figure it out.
