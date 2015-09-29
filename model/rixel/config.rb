@@ -98,13 +98,12 @@ class Rixel::Config
       File.open(test_path, 'w') do |f|
         f.puts "rixel write test"
       end
-      File.delete(test_path)
+      File.unlik(test_path)
     rescue => e
       raise "Rixel::Config error - Unable to write to #{@path}"
     end
     Paperclip::Attachment.default_options[:storage] = :filesystem
     Paperclip::Attachment.default_options[:path] = "#{@path}/:id"
-puts "Using path: #{@path}/:id"
     true
   end
 
@@ -140,7 +139,10 @@ puts "Using path: #{@path}/:id"
   # Configure S3.
   def configure_s3_settings
     s3 = config[:storage][:s3]
-    @s3 = false and return if s3.nil?
+    if s3.nil?
+      @s3 = false
+      return
+    end
     credentials = s3[:s3_credentials]
     unless credentials.is_a?(Hash)
       raise "Rixel::Config error - s3 specified without s3_credentials hash"

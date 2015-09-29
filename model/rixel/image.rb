@@ -7,9 +7,8 @@ class Rixel::Image
   field :w,  type: Integer
   field :h, type: Integer
   field :parent_id, type: String
-  field :crop_x, type: Integer, default: nil
-  field :crop_y, type: Integer, default: nil
-  field :skip_id_generation, type: Boolean, default: false
+  field :crop_x, type: Integer, default: 0
+  field :crop_y, type: Integer, default: 0
 
   # Make sure we have a width and height.
   validates_presence_of :w
@@ -21,15 +20,12 @@ class Rixel::Image
   # Face recognition.
   embeds_many :faces, class_name: 'Rixel::Image::Face'
 
-  # Generate a shorter image ID.
-  before_create :generate_id
-
   # S3 callbacks.
   after_create :send_to_s3
   after_destroy :remove_from_s3
 
-  # After loading an image, let's reset the updated_at field.
-  after_find :set_updated_at
+  # Make sure there's room for images when loading.
+  before_create :make_room
 
   # Attached image.
   has_mongoid_attached_file(:image, {
@@ -37,17 +33,25 @@ class Rixel::Image
     url: Rixel::Config.url,
     styles: lambda do |a|
       if a.instance.round
-        return {
+        {
           original: {
             convert_options: a.instance.round_style,
             format: :png
           }
         }
+      elsif a.instance.crop_x > 0 or a.instance.crop_y > 0
+        {
+          original: {
+            convert_options: a.instance.crop_style
+          }
+        }
+      else
+        {original: "#{a.instance.w}x#{a.instance.h}#"}
       end
-      {original: "#{a.instance.w}x#{a.instance.h}#"}
     end
   })
   validates_attachment :image, content_type: { content_type: /\Aimage\/.+\Z/ }
+
 
   # Get the URL for an image.
   def url
@@ -59,13 +63,9 @@ class Rixel::Image
     "\\( -size #{w}x#{h} xc:none -fill white -draw 'circle #{(w / 2).to_i},#{(h / 2).to_i} #{(w/ 2).to_i},0' \\) -compose copy_opacity -composite"
   end
 
-  # Generate a unique, short(er) ID.
-  def generate_id
-    return if skip_id_generation
-    while self._id = SecureRandom.urlsafe_base64(Rixel::Config.id_length)
-      break unless Rixel::Image.where(_id: self._id).exists?
-    end
-    self._id
+  # Crop.
+  def crop_style
+    "-crop #{w}x#{h}+#{crop_x}+#{crop_y}"
   end
 
   # Store the image in S3.
@@ -80,6 +80,26 @@ class Rixel::Image
     return unless Rixel::Config.s3?
     return unless parent_id.nil?
     Rixel::S3Interface.delete(id)
+  end
+
+  # Get the total size.
+  def get_total_size
+    Rixel::Image.sum(:image_file_size)
+  end
+
+  # Make room for images.
+  def make_room
+    return unless Rixel::Config.s3?
+    unless Rixel::Config.cache_max_files.nil?
+      while Rixel::Image.count > Rixel::Config.cache_max_files
+        Rixel::Image.all.sort(updated_at: 1).first.destroy
+      end
+    end
+    unless Rixel::Config.cache_max_size.nil?
+      while Rixel::Image.sum(:image_file_size) > Rixel::Config.cache_max_size
+        Rixel::Image.all.sort(updated_at: 1).first.destroy
+      end
+    end
   end
 
   # Find faces.
@@ -122,6 +142,18 @@ class Rixel::Image
     end
     options[:w] = (options[:w] || w).to_i
     options[:h] = (options[:h] || h).to_i
+    options[:crop_x] = (options[:crop_x] || 0).to_i
+    options[:crop_y] = (options[:crop_y] || 0).to_i
+    unless options[:crop_x].nil?
+      if options[:crop_x] < 0 or options[:crop_x] > options[:w]
+        raise "Invalid crop_x value"
+      end
+    end
+    unless options[:crop_y].nil?
+      if options[:crop_y] < 0 or options[:crop_y] > options[:h]
+        raise "Invalid crop_y value"
+      end
+    end
     options
   end
 
@@ -185,7 +217,7 @@ class Rixel::Image
   # Class methods.
   class << self
     # Create a new image from a file path.
-    def create_from_file(path, id=nil)
+    def create_from_file(path)
       geometry = Paperclip::Geometry.from_file(path) rescue nil
       raise 'Invalid image' if geometry.nil?
 
@@ -195,16 +227,14 @@ class Rixel::Image
         h: geometry.height,
         image: ::File.open(path)
       }
-      image_args[:_id] = id unless id.nil?
-      image_args[:skip_id_generation] = true unless id.nil?
       image = Rixel::Image.new(image_args)
-      #image.find_faces(image[:tempfile])
       begin
         image.save!
       rescue => e
         puts "Error saving image: #{e}, cleaning up..."
         rv = image.destroy rescue nil
       end
+      image.save!
       image
     end
 
