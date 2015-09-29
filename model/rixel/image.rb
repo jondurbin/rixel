@@ -257,7 +257,7 @@ class Rixel::Image
   # Class methods.
   class << self
     # Create a new image from a file path.
-    def create_from_file(path)
+    def create_from_file(path, id=nil)
       geometry = Paperclip::Geometry.from_file(path) rescue nil
       raise 'Invalid image' if geometry.nil?
 
@@ -268,6 +268,7 @@ class Rixel::Image
         image: ::File.open(path)
       }
       image = Rixel::Image.new(image_args)
+      image.id = id unless id.nil?
       begin
         image.save!
       rescue => e
