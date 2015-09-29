@@ -16,13 +16,11 @@ require_relative 'model/rixel/s3_interface'
 require_relative 'model/rixel/image'
 require_relative 'model/rixel/image/file'
 require_relative 'model/rixel/image/face'
-require_relative 'model/rixel/image/file/cache'
 
 # Mongoid configuration.
 Mongoid.load!('config/mongoid.yml')
 
 # Rixel configuration.
-Rixel::Config.parse('config/rixel.yml')
 image_endpoint = Rixel::Config.url.gsub(/^\//, '')
 
 # Cuba configuration.
@@ -49,10 +47,7 @@ RixelServer = Cuba.define do
         res.status = 404
         halt(res.finish)
       end
-      image = parent.variant(options)
-      if image.nil?
-        image = parent.create_variant(options)
-      end
+      image = parent.get_or_create_variant(options)
       send_file(Rixel::Image::File.open(image))
     end
     res.status = 404
@@ -63,7 +58,7 @@ RixelServer = Cuba.define do
     on 'image' do
       on param('file') do |image|
         on image[:tempfile].is_a?(Tempfile) do
-          image = Rixel::Image.create(image[:tempfile].path) rescue nil
+          image = Rixel::Image.create_from_file(image[:tempfile].path) rescue nil
           on image.nil? do
             res.status = 422
             res.write 'Invalid image'

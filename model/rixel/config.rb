@@ -1,131 +1,210 @@
 class Rixel::Config
+
+  # Wrap our config in the class method.
   class << self
-    def ensure_initialized
-      return if @parsed
-      Rixel::Config.parse('config/rixel.yml')
-      @parsed = true
+    def config
+      $config ||= Rixel::Config.new('config/rixel.yml')
     end
-
-    # Symbolize keys.
-    def symbolize_keys(hash)
-      symbolized = {}
-      hash.each do |key, value|
-        if value.is_a?(Hash)
-          symbolized[key.to_sym] = symbolize_keys(value)
-        elsif value.is_a?(Array)
-          value.each do |item|
-            if item.is_a?(Hash)
-              item = symbolize_keys(item)
-            end
-          end
-        else
-          symbolized[key.to_sym] = value
-        end
-      end
-      symbolized
+    def id_length
+      config.id_length
     end
-
-    # Parse a YAML configuration file.
-    def parse(path)
-      options = symbolize_keys(YAML.load_file(path))
-      configure_storage(options)
-      unless local_storage?
-        configure_cache(options[:storage])
-      end
-      @url = options[:url]
+    def path
+      config.path
     end
-
-    # Configure the S3 cache options.
-    def configure_cache(options)
-      @cache_dir = options[:cache].nil? ? nil : options[:cache][:path]
-
-      # Max age?
-      if options[:cache][:max_age] and options[:cache][:max_age] =~ /\A(\d+)([smhd])?\Z/
-        value = $1.to_i
-        multiplier = $2.nil? ? 1 : {'s' => 1, 'm' => 60, 'h' => 60 * 60, 'd' => 60 * 24}[$2]
-        @max_age = value * multiplier
-      end
-
-      # Max files?
-      if options[:cache][:max_files] and "#{options[:cache][:max_files]}" =~ /\A(\d+)\Z/
-        @max_files = options[:cache][:max_files].to_i
-      end
-
-      # Max size?
-      if options[:cache][:max_size] and "#{options[:cache][:max_size]}".downcase =~ /\A(\d+)([kmg])\Z/
-        value = $1.to_i
-        multiplier = $2.nil? ? 1 : {'k' => 1024, 'm' => 1024 * 1024, 'g' => 1024 * 1024 * 1024}[$2]
-        @max_size = value * multiplier
-      end
+    def s3?
+      config.s3
     end
-
-    # Configure the storage options.
-    def configure_storage(options)
-      storage = options[:storage]
-      if not storage[:s3].nil?
-        use_s3(storage[:s3])
-      elsif not storage[:local].nil?
-        use_local(storage[:local])
-      else
-        raise 'No storage backend specified!'
-      end
+    def s3_bucket_name
+      config.s3_bucket_name
     end
-
-    # Configure the URL.
+    def s3_path
+      config.s3_path
+    end
+    def cache_max_size
+      config.cache_max_size
+    end
+    def cache_max_files
+      config.cache_max_files
+    end
     def url
-      ensure_initialized
-      @url
+      config.url
     end
+    def url_builder
+      config.url_builder
+    end
+  end
 
-    # Get or set cache dir.
-    def cache_dir
-      @cache_dir
-    end
+  attr_reader :url              # URL format.
+  attr_reader :id_length        # Number of characters to use for the ID length.
+  attr_reader :s3               # S3 enabled?
+  attr_reader :path             # Folder for storing images locally.
+  attr_reader :s3_bucket_name   # Name of the bucket we'll be using.
+  attr_reader :s3_path          # Path structure for the S3 bucket.
+  attr_reader :cache_max_size   # Maximum size of cached files.
+  attr_reader :cache_max_files  # Maximum number of cached files.
+  attr_reader :url_builder      # Lambda function we'll use to generate image urls.
 
-    # Configure s3 as the storage.
-    def use_s3(options)
-      @s3 = true
-      Paperclip::Attachment.default_options[:path] = options[:path]
-      Paperclip::Attachment.default_options[:bucket] = options[:bucket]
-      Paperclip::Attachment.default_options[:storage] = :s3
-      Paperclip::Attachment.default_options[:s3_credentials] = {
-        access_key_id: options[:access_key_id],
-        secret_access_key: options[:secret_access_key]
-      }
-      Paperclip::Attachment.default_options[:s3_host_name] = options[:s3_host_name]
-      Paperclip::Attachment.default_options[:s3_host_alias] = options[:s3_host_alias]
-    end
+  # Create a new Rixel configuration.
+  def initialize(path)
+    @rixel_config = symbolize_keys(YAML.load_file(path))
+    env  # Will raise an error unless the current env is defined.
+    configure_id_length
+    configure_url_format
+    configure_storage
+    #configure_face_samples
+  end
 
-    # Set max age.
-    def max_age
-      @max_age
+  # Configure ID length.
+  def configure_id_length
+    @id_length = config[:id_length]
+    @id_length ||= 8
+    unless "#{@id_length}" =~ /\A\d+\Z/
+      raise "Rixel::Config error - Invalid ID length: #{config[:id_lenght]}"
     end
+  end
 
-    # Max size.
-    def max_size
-      @max_size
+  # Configure the URL format we'll be using.
+  def configure_url_format
+    @url = config[:url]
+    if "#{@url}" =~ /\A(\/[a-z0-9\-_]+)*\/:id(\/[a-z0-9\-_\/]*)?\Z/
+      @url_builder = lambda {|id| @url.gsub(/:id/, id)}
+    else
+      raise "Rixel::Config error - Invalid URL format: #{url}"
     end
+  end
 
-    # Max file count.
-    def max_files
-      @max_files
+  # Configure the storage.
+  def configure_storage
+    storage = config[:storage]
+    if storage.nil?
+      raise 'Rixel::Config error - storage not specified!'
     end
+    configure_storage_directory
+    configure_s3_settings
+    configure_cache_settings
+  end
 
-    # Configure local storage.
-    def use_local(options)
-      @s3 = false
-      Paperclip::Attachment.default_options[:storage] = :filesystem
-      Paperclip::Attachment.default_options[:path] = options[:path]
+  # Configure the storage directory.
+  def configure_storage_directory
+    @path = config[:storage][:path]
+    if @path.nil?
+      raise "Rixel::Config error - no storage path specified"
     end
+    unless File.directory?(@path)
+      raise "Rixel::Config error - #{@path} is not a directory"
+    end
+    begin
+      test_path = File.join(@path, SecureRandom.uuid)
+      File.open(test_path, 'w') do |f|
+        f.puts "rixel write test"
+      end
+      File.delete(test_path)
+    rescue => e
+      raise "Rixel::Config error - Unable to write to #{@path}"
+    end
+    Paperclip::Attachment.default_options[:storage] = :filesystem
+    Paperclip::Attachment.default_options[:path] = "#{@path}/:id"
+puts "Using path: #{@path}/:id"
+    true
+  end
 
-    # Locally stored?
-    def local_storage?
-     @s3 ? false : true
+  # Configure the cache settings.
+  def configure_cache_settings
+    return unless s3?
+    cache = config[:storage][:s3][:cache]
+    if cache.nil?
+      @cache_max_size = nil
+      @cache_max_files = nil
+      return
     end
+    if cache[:max_size].nil?
+      @cache_max_size = nil
+    else
+      if "#{cache[:max_size]}".downcase =~ /\A(\d+)([mg])?\Z/
+        @cache_max_size = $1.to_i * 1024 * 1024 * {'m' => 1, 'g' => 1025}[$2 || "m"]
+      else
+        raise "Rixel::Config error - invalid cache max_size value: #{cache[:max_size]}"
+      end
+    end
+    if cache[:max_files].nil?
+      @cache_max_size = nil
+    else
+      if "#{cache[:max_size]}".downcase =~ /\A\d+\Z/
+        @cache_max_size = cache[:max_size].to_i
+      else
+        raise "Rixel::Config error - invalid cache max_files value: #{cache[:max_files]}"
+      end
+    end
+  end
 
-    # Set the face recognition sample path.
-    def face_sample_path
-      @face_sample_path
+  # Configure S3.
+  def configure_s3_settings
+    s3 = config[:storage][:s3]
+    @s3 = false and return if s3.nil?
+    credentials = s3[:s3_credentials]
+    unless credentials.is_a?(Hash)
+      raise "Rixel::Config error - s3 specified without s3_credentials hash"
     end
+    if credentials[:access_key_id].nil?
+      raise "Rixel::Config error - access_key_id not specified"
+    end
+    if credentials[:secret_access_key].nil?
+      raise "Rixel::Config error - secret_access_key not specified"
+    end
+    @s3_bucket_name = s3[:bucket_name]
+    if @s3_bucket_name.nil?
+      raise "Rixel::Config error - bucket name not specified"
+    end
+    @s3_path = s3[:path]
+    if @s3_path.nil?
+      raise "Rixel::Config error - s3_path not specified"
+    end
+    AWS.config(
+      access_key_id: credentials[:access_key_id],
+      secret_access_key: credentials[:secret_access_key]
+    )
+    @s3 = true
+    true
+  end
+
+  # S3 enabled?
+  def s3?
+    @s3
+  end
+
+ private
+  # Symbolize keys.
+  def symbolize_keys(hash)
+    symbolized = {}
+    hash.each do |key, value|
+      if value.is_a?(Hash)
+        symbolized[key.to_sym] = symbolize_keys(value)
+      elsif value.is_a?(Array)
+        value.each do |item|
+          if item.is_a?(Hash)
+            item = symbolize_keys(item)
+          end
+        end
+      else
+        symbolized[key.to_sym] = value
+      end
+    end
+    symbolized
+  end
+
+  # Get the current environment.
+  def env
+    return @env if @env
+    e = ENV['MONGOID_ENV'] || ENV['RACK_ENV']
+    if e.nil? or @rixel_config[e.to_sym].nil?
+      raise "No configuration specified for environment '#{e}'"
+    end
+    @env = e.to_sym
+    @env
+  end
+
+  # Get the raw config.
+  def config
+    @rixel_config[env]
   end
 end

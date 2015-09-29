@@ -1,4 +1,12 @@
-storage:
-  local:
-    path: /rixel-drop/:id
-url: /images/:id
+production:
+  url: /images/:id
+  storage:
+    path: /path/to/rixel-storage
+    s3:
+      path: /images/:id
+      bucket_name: S3_BUCKET_NAME
+      s3_credentials:
+        access_key_id: ACCESS_KEY_ID
+        secret_access_key: SECRET_ACCESS_KEY
+      cache:
+        max_size: 40g
