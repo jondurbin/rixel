@@ -98,9 +98,9 @@ class Rixel::Config
       File.open(test_path, 'w') do |f|
         f.puts "rixel write test"
       end
-      File.unlik(test_path)
+      File.unlink(test_path)
     rescue => e
-      raise "Rixel::Config error - Unable to write to #{@path}"
+      raise "Rixel::Config error - Unable to write to #{@path}: #{e}"
     end
     Paperclip::Attachment.default_options[:storage] = :filesystem
     Paperclip::Attachment.default_options[:path] = "#{@path}/:id"
