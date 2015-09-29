@@ -126,10 +126,10 @@ class Rixel::Config
       end
     end
     if cache[:max_files].nil?
-      @cache_max_size = nil
+      @cache_max_files = nil
     else
-      if "#{cache[:max_size]}".downcase =~ /\A\d+\Z/
-        @cache_max_size = cache[:max_size].to_i
+      if "#{cache[:max_files]}".downcase =~ /\A\d+\Z/
+        @cache_max_files = cache[:max_files].to_i
       else
         raise "Rixel::Config error - invalid cache max_files value: #{cache[:max_files]}"
       end
