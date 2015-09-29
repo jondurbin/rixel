@@ -9,6 +9,8 @@ class Rixel::Image
   field :parent_id, type: String
   field :crop_x, type: Integer, default: 0
   field :crop_y, type: Integer, default: 0
+  field :x, type: Integer, default: 0
+  field :y, type: Integer, default: 0
 
   # Make sure we have a width and height.
   validates_presence_of :w
@@ -39,6 +41,12 @@ class Rixel::Image
             format: :png
           }
         }
+      elsif a.instance.x > 0 or a.instance.y > 0
+        {
+          original: {
+            convert_options: a.instance.offset_style
+          }
+        }
       elsif a.instance.crop_x > 0 or a.instance.crop_y > 0
         {
           original: {
@@ -65,7 +73,12 @@ class Rixel::Image
 
   # Crop.
   def crop_style
-    "-crop #{w}x#{h}+#{crop_x}+#{crop_y}"
+    "-crop #{w}x#{h}-#{crop_x}-#{crop_y}"
+  end
+
+  # Offset.
+  def offset_style
+    "-crop #{w}x#{h}+#{x}+#{y}"
   end
 
   # Store the image in S3.
@@ -142,6 +155,8 @@ class Rixel::Image
     end
     options[:w] = (options[:w] || w).to_i
     options[:h] = (options[:h] || h).to_i
+    options[:x] = (options[:x] || x).to_i
+    options[:y] = (options[:y] || y).to_i
     options[:crop_x] = (options[:crop_x] || 0).to_i
     options[:crop_y] = (options[:crop_y] || 0).to_i
     unless options[:crop_x].nil?
@@ -152,6 +167,16 @@ class Rixel::Image
     unless options[:crop_y].nil?
       if options[:crop_y] < 0 or options[:crop_y] > options[:h]
         raise "Invalid crop_y value"
+      end
+    end
+    unless options[:x].nil?
+      if options[:x] > options[:w] - options[:crop_x]
+        raise "Invalid x value"
+      end
+    end
+    unless options[:y].nil?
+      if options[:y] > options[:h] - options[:crop_y]
+        raise "Invalid y value"
       end
     end
     options
@@ -184,34 +209,48 @@ class Rixel::Image
     # Does the variant exist?
     existing = variant(options)
     unless existing.nil?
+      puts "Found this one: #{existing.inspect}"
+      puts "Options: #{options.inspect}"
       return existing
     end
 
-    # Same size, but other parameters are different.
-    if options[:w] == w and options[:h] == h
-      image = Rixel::Image.new(options.merge(parent_id: id, image: get_file))
-      image.save!
-      return image
+    # Apply the updates one by one.
+    previous_variation = self
+    full_args = {}
+    [
+      {parent_id: id, w: options[:w], h: options[:h]},
+      {crop_x: options[:crop_x], crop_y: options[:crop_y]},
+      {x: options[:x], y: options[:y]}
+    ].each do |step_args|
+      full_args.merge!(step_args)
+      variation = Rixel::Image.where(full_args).first
+      if variation.nil?
+        variation = Rixel::Image.new(full_args)
+        variation.image = previous_variation.get_file
+        variation.save!
+      else
+        puts "Found this variant: #{variation.inspect}"
+      end
+      previous_variation = variation
     end
-
-    # New size.
-    base_options = {parent_id: id, w: options[:w], h: options[:h]}
-    starting_image = Rixel::Image.where(base_options).first
-    if starting_image.nil?
-      starting_image = Rixel::Image.new(base_options.merge(image: get_file))
-      starting_image.save!
+    if options[:round]
+      # Create the square version of the image.
+      width = options[:w] - options[:x] - options[:crop_x]
+      height = options[:h] - options[:y] - options[:crop_x]
+      small = [width, height].min
+      step_args = {w: small, h: small, parent_id: parent_id}
+      variation = Rixel::Image.where(step_args).first
+      if variation.nil?
+        variation = Rixel::Image.new(w: small, h: small, parent_id: parent_id, image: previous_variation.get_file)
+        variation.save!
+      end
+      final_image = Rixel::Image.new(w: small, h: small, parent_id: parent_id, image: variation.get_file)
+      final_image.save!
+      final_image.update_attributes!(options)
+      puts "This is the final image: #{final_image.inspect}"
+      previous_variation = final_image
     end
-
-    # Apply any further transforms.
-    mismatch = false
-    options.each do |k, v|
-      mismatch = true and break if starting_image[k] != v
-    end
-    return starting_image unless mismatch
-
-    final_image = Rixel::Image.new(options.merge(parent_id: id, image: starting_image.get_file))
-    final_image.save!
-    final_image
+    previous_variation
   end
 
   # Class methods.

@@ -32,7 +32,7 @@ RixelServer = Cuba.define do
   def options
     return @options unless @options.nil?
     @options = {}
-    ['w', 'h', 'crop_x', 'crop_y'].each do |key|
+    ['w', 'h', 'x', 'y', 'crop_x', 'crop_y'].each do |key|
       @options[key.to_sym] = req[key] if "#{req[key]}" =~ /\A\d+\Z/
     end
     @options[:round] = true if "#{req['round']}".downcase == 'true'
