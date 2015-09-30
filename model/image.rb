@@ -15,6 +15,7 @@ class Rixel::Image
   field :x, type: Integer, default: 0
   field :y, type: Integer, default: 0
   field :signature, type: String
+  field :downloaded, type: Boolean, default: false
 
   # Options.
   field :round, type: Boolean, default: false
@@ -22,9 +23,6 @@ class Rixel::Image
   # Labels.
   embeds_many :labels, class_name: 'Rixel::Image::Label'
   accepts_nested_attributes_for :labels
-
-  # S3 callbacks.
-  after_destroy :remove_from_s3
 
   # Make sure there's room for images when loading.
   before_create :make_room
@@ -88,8 +86,9 @@ class Rixel::Image
 
       # (Try) to download from s3.
       if Rixel::Config.s3? and Rixel::S3Interface.exists?(id)
-        Rixel::S3Interface.download(id, File.join(Rixel::Config.path, id))
-        image = Rixel::Image.create_from_file(temp_path, id)
+        path = File.join(Rixel::Config.path, id)
+        Rixel::S3Interface.download(id, path)
+        image = Rixel::Image.create_from_file(path, id, {downloaded: true})
         return image
       end
       nil
@@ -179,6 +178,7 @@ class Rixel::Image
 
   # Store the image in S3.
   def send_to_s3
+    return if downloaded
     return unless Rixel::Config.s3?
     return unless parent_id.nil?
     Rixel::S3Interface.put(self, image.queued_for_write[:original])

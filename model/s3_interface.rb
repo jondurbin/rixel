@@ -26,6 +26,7 @@ class Rixel::S3Interface
     end
 
     def exists?(id)
+      log(id, "Exists")
       bucket.objects[path_for(id)].exists?
     end
    private
