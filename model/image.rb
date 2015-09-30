@@ -24,7 +24,6 @@ class Rixel::Image
   accepts_nested_attributes_for :labels
 
   # S3 callbacks.
-  after_create :send_to_s3
   after_destroy :remove_from_s3
 
   # Make sure there's room for images when loading.
@@ -59,18 +58,19 @@ class Rixel::Image
       # Try to save the image.
       image_args = {
         w: geometry.width,
-        h: geometry.height,
-        image: File.open(path)
+        h: geometry.height
       }.merge(args.symbolize_keys)
       image = Rixel::Image.new(image_args)
       image.id = id unless id.nil?
+      image.save!
+      image.image = File.open(path)
       begin
         image.save!
+        image.send_to_s3
       rescue => e
         puts "Error saving image: #{e}, cleaning up..."
         rv = image.destroy rescue nil
       end
-      image.image.reprocess!
       image
     end
 
@@ -267,9 +267,16 @@ class Rixel::Image
   def get_or_create_variant(options)
     variant = find_variant(options)
     if variant.nil?
-      variant = Rixel::Image.new(options.merge(parent_id: id, image: get_file))
+      variant = Rixel::Image.new(options.merge(parent_id: id))
       variant.save!
-      variant.image.reprocess!
+      variant.image = get_file
+      variant.save!
+      begin
+        variant.send_to_s3
+      rescue => e
+        puts "Error saving to S3: #{e}"
+        variant.destroy
+      end
     end
     variant
   end
