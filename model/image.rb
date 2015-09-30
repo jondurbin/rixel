@@ -6,6 +6,8 @@ class Rixel::Image
 
   auto_load true, :directories => ['model/image']
 
+  VALID_FIELDS = [:w, :h, :crop_x, :crop_y, :x, :y, :parent_id]
+
   # Dimensions.
   field :w,  type: Integer
   field :h, type: Integer
@@ -42,7 +44,7 @@ class Rixel::Image
   })
 
   # Before processing, validate args and generate the signature.
-  before_save :generate_signature
+  before_create :generate_signature
 
   validates_attachment :image, content_type: { content_type: /\Aimage\/.+\Z/ }
 
@@ -166,7 +168,7 @@ class Rixel::Image
 
   # Generate the style.
   def generate_convert_options
-    validate_args
+    validate_args rescue nil
     [
       size_args,
       offset_args,

@@ -1,6 +1,8 @@
 class Rixel::Image::Label
   include Mongoid::Document
 
+  VALID_FIELDS = [:text, :font, :size, :pos, :color, :border_color, :border_size]
+
   # The label text.
   field :text, type: String
 
