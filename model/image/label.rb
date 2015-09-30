@@ -26,7 +26,7 @@ class Rixel::Image::Label
   field :is_valid, type: Boolean, default: true
 
   # Belongs to an image.
-  belongs_to :image
+  embedded_in :image
 
   # Before saving, validate and/or use defaults.
   after_initialize :get_validated_args
@@ -83,7 +83,7 @@ class Rixel::Image::Label
     if size.is_a?(Numeric) and size > 0 and size < 100
       size
     else
-      Config.label_defaults[:size] || 30
+      Rixel::Config.label_defaults[:size] || 30
     end
   end
 
@@ -91,7 +91,7 @@ class Rixel::Image::Label
     if "#{pos}" =~ Rixel::Config::LABEL_POSITION_VALIDATOR
       "#{pos}".downcase
     else
-      Config.label_defaults[:pos] || 'center'
+      Rixel::Config.label_defaults[:pos] || 'center'
     end
   end
 
@@ -99,7 +99,7 @@ class Rixel::Image::Label
     if "#{color}" =~ Rixel::Config::COLOR_VALIDATOR
       "#{color}".downcase
     else
-      Config.label_defaults[:color] || 'white'
+      Rixel::Config.label_defaults[:color] || 'white'
     end
   end
 
@@ -107,7 +107,7 @@ class Rixel::Image::Label
     if "#{border_color}" =~ Rixel::Config::COLOR_VALIDATOR
        "#{border_color}".downcase
     else
-      Config.label_defaults[:border_color] || 'black'
+      Rixel::Config.label_defaults[:border_color] || 'black'
     end
   end
 
@@ -118,6 +118,6 @@ class Rixel::Image::Label
         return w
       end
     end
-    Config.label_defaults[:border_size] || 1
+    Rixel::Config.label_defaults[:border_size] || 1
   end
 end

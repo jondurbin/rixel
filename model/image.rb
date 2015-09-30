@@ -14,17 +14,14 @@ class Rixel::Image
   field :crop_y, type: Integer, default: 0
   field :x, type: Integer, default: 0
   field :y, type: Integer, default: 0
-  field :label_args, type: Array, default: []
   field :signature, type: String
 
   # Options.
   field :round, type: Boolean, default: false
 
-  # Face recognition.
-  has_many :faces, class_name: 'Rixel::Image::Face', dependent: :destroy
-
   # Labels.
-  has_many :labels, class_name: 'Rixel::Image::Face', dependent: :destroy
+  embeds_many :labels, class_name: 'Rixel::Image::Label'
+  accepts_nested_attributes_for :labels
 
   # S3 callbacks.
   after_create :send_to_s3
@@ -32,9 +29,6 @@ class Rixel::Image
 
   # Make sure there's room for images when loading.
   before_create :make_room
-
-  # Before saving, validate args and generate the signature.
-  after_initialize :generate_signature
 
   # Attached image.
   has_mongoid_attached_file(:image, {
@@ -49,6 +43,10 @@ class Rixel::Image
       }
     end
   })
+
+  # Before processing, validate args and generate the signature.
+  before_save :generate_signature
+
   validates_attachment :image, content_type: { content_type: /\Aimage\/.+\Z/ }
 
   # Class methods.
@@ -62,7 +60,7 @@ class Rixel::Image
       image_args = {
         w: geometry.width,
         h: geometry.height,
-        image: ::File.open(path)
+        image: File.open(path)
       }.merge(args.symbolize_keys)
       image = Rixel::Image.new(image_args)
       image.id = id unless id.nil?
@@ -72,6 +70,7 @@ class Rixel::Image
         puts "Error saving image: #{e}, cleaning up..."
         rv = image.destroy rescue nil
       end
+      image.image.reprocess!
       image
     end
 
@@ -100,7 +99,6 @@ class Rixel::Image
   # Hash of all the args.
   def to_hash
     {
-      id: id.to_s,
       w: w,
       h: h,
       parent_id: parent_id,
@@ -108,14 +106,15 @@ class Rixel::Image
       crop_y: crop_y,
       x: x,
       y: y,
-      labels: labels.each.collect {|label| label.to_hash},
-      faces: faces.each.collect {|face| face.to_hash}
+      round: round,
+      labels: labels.each.collect {|label| label.to_hash.sort}.sort
     }
   end
 
   # Generate a signature.
   def generate_signature
-    self.signature = Digest::MD5.hexdigest(Marshal.dump(to_hash.merge(id: nil)))
+    validate_args
+    self.signature = Digest::MD5.hexdigest(to_hash.sort.inspect)
     self.signature
   end
 
@@ -151,7 +150,7 @@ class Rixel::Image
 
   # Labels.
   def img_label_args
-    args = self.labels.each.collect do |label|
+    args = labels.each.collect do |label|
       [
         "-pointsize #{label.size}",
         "-gravity #{label.pos}",
@@ -212,55 +211,65 @@ class Rixel::Image
     end
   end
 
-  # Find faces.
-  def find_faces(input_file=get_file)
-    self.faces = Rixel::Image::Face.detect(input_file)
-  end
-
   # Parent image.
   def original
-    @original ||= if parent_id.nil?
-      self
+    return @original unless @original.nil?
+    if self.parent_id.nil?
+      @original = self
     else
-      Rixel::Image.where(parent_id: parent_id).first
+      @original = Rixel::Image.where(id: self.parent_id).first
     end
     @original
   end
 
   # File.
   def get_file
-    Rixel::Image::File.open(self)
+    # Stored locally?
+    path = File.join(Rixel::Config.path, id)
+    if File.exists?(path)
+      return File.open(path)
+    end
+
+    # Download from S3.
+    if Rixel::Config.s3?
+      Rixel::S3Interface.download(id, path)
+      return File.open(path)
+    end
+
+    # Hmmm...
+    nil
   end
 
   # Calculate height given a new width.
   def height_for_width(width)
-    if width.to_i > w
+    if width.to_i > original.w
       raise 'Invalid size - requested width is greater than original'
     end
-    width.to_i / (w / h)
+    width.to_i / (original.w / original.h)
   end
 
   # Calculate the width given a new height.
   def width_for_height(height)
-    if height.to_i > h
+    if height.to_i > original.h
       raise 'Invalid size - requested height is greater than original height'
     end
-    height.to_i * (w / h)
+    height.to_i * (original.w / original.h)
   end
 
   # Find a variant.
   def find_variant(options)
-    temp = Rixel::Image.new(options)
-    temp.validate_args
-    Rixel::Image.where(signaure: temp.generate_signature).first
+    return self if options.empty?
+    s = Rixel::Image.new(options.merge(parent_id: id)).generate_signature
+    Rixel::Image.where(signature: s).first
   end
 
   # Get or create a new version of the image.
   def get_or_create_variant(options)
     variant = find_variant(options)
     if variant.nil?
-      variant = Rixel::Image.new(options)
+      variant = Rixel::Image.new(options.merge(parent_id: id, image: get_file))
       variant.save!
+      variant.image.reprocess!
     end
     variant
   end
@@ -274,24 +283,15 @@ class Rixel::Image
     self.crop_x = validated_crop_x
     self.crop_y = validated_crop_y
     self.round = round.is_a?(Boolean) ? round : false
-    self.labels = self.label_args.each.collect do |args|
-      label = Rixel::Image::Label.new(args)
-      puts label.to_hash
-      label
-    end.delete_if {|label| not label.is_valid}
+    self.labels.delete_if {|label| not label.is_valid}
   end
 
   private
-  def validate_and_generate_signature
-    validate_args
-    generate_signature
-  end
-
   def validated_width
     width = nil
     if w.nil? and not h.nil?
       if h.is_a?(Numeric) and h > 0 and h <= original.h
-        width = height_for_width(h.to_i)
+        width = width_for_height(h.to_i)
       end
     elsif w.is_a?(Numeric) or "#{w}" =~ /\A\d+(\.\d+)?\Z/
       width = "#{w}".to_i

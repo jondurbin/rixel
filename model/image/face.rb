@@ -9,7 +9,7 @@ class Rixel::Image::Face
   field :height, type: Integer
 
   # Belongs to an image.
-  belongs_to :image, class_name: 'Rixel::Image'
+  embedded_in :image
 
   # As hash.
   def to_hash
