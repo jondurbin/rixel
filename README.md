@@ -23,16 +23,31 @@ Rixel is a ruby web-server which servers as an image proxy that can transform im
 production:
   url: /images/:id
   storage:
-    path: /path/to/local/rixel/storage
+    path: /rixel-drop
     s3:
-      s3_credentials:
-        access_key_id: AWS_ACCESS_KEY_ID
-        secret_access_key: AWS_SECRET_ACCESS_KEY
-      bucket_name: AWS_BUCKET_NAME
       path: /images/:id
+      bucket_name: S3_BUCKET_NAME
+      s3_credentials:
+        access_key_id: ACCESS_KEY_ID
+        secret_access_key: SECRET_ACCESS_KEY
       cache:
-        max_files: 1000
-        max_size: 1g
+        max_size: 40g
+  max_size:
+    width: 1000
+    height: 1000
+  labels:
+    default:
+      size: 40
+      border_color: black
+      border_size: 1
+      color: white
+      font: Impact
+    available_fonts:
+      - Impact
+      - Times
+    imagemagick:
+      convert: /usr/local/bin/convert
+      identify: /usr/local/bin/identify
 ```
 #### Description
 1. url: The path used for serving images, e.g. /path/to/image/:id
