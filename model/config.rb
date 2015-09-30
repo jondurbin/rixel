@@ -1,18 +1,24 @@
 class Rixel::Config
+  LABEL_POSITION_VALIDATOR = Regexp.new('\A((north|south)(east|west)?|(east|west|center))\Z', true)
+  COLOR_VALIDATOR = Regexp.new('\A([a-z0-9][a-z0-9\-]+[a-z0-9]|#[0-9a-f]{3,6})\Z', true)
+  LABEL_BORDER_SIZE_VALUES = (1..5).collect
 
   # Wrap our config in the class method.
   class << self
     def config
-      $config ||= Rixel::Config.new('config/rixel.yml')
+      $rixel_config ||= Rixel::Config.new('config/rixel.yml')
+    end
+    def url
+      config.url
     end
     def id_length
       config.id_length
     end
-    def path
-      config.path
-    end
     def s3?
       config.s3
+    end
+    def path
+      config.path
     end
     def s3_bucket_name
       config.s3_bucket_name
@@ -26,11 +32,26 @@ class Rixel::Config
     def cache_max_files
       config.cache_max_files
     end
-    def url
-      config.url
-    end
     def url_builder
       config.url_builder
+    end
+    def label_defaults
+      config.label_defaults
+    end
+    def available_fonts
+      config.available_fonts
+    end
+    def max_width
+      config.max_width
+    end
+    def max_height
+      config.max_height
+    end
+    def convert_path
+      config.convert_path
+    end
+    def identify_path
+      config.identify_path
     end
   end
 
@@ -43,15 +64,40 @@ class Rixel::Config
   attr_reader :cache_max_size   # Maximum size of cached files.
   attr_reader :cache_max_files  # Maximum number of cached files.
   attr_reader :url_builder      # Lambda function we'll use to generate image urls.
+  attr_reader :label_defaults   # Default label values.
+  attr_reader :available_fonts  # Array of available fonts.
+  attr_reader :max_width        # Maximum width of an image.
+  attr_reader :max_height       # Maximum height of an image.
+  attr_reader :convert_path     # Path to the convert binary.
+  attr_reader :identify_path    # Path to the identify binary.
 
   # Create a new Rixel configuration.
   def initialize(path)
-    @rixel_config = symbolize_keys(YAML.load_file(path))
+    @rixel_config = YAML.load_file(path).symbolize_keys
     env  # Will raise an error unless the current env is defined.
+    configure_binary_paths
     configure_id_length
     configure_url_format
     configure_storage
+    configure_max_size
+    configure_available_fonts
+    configure_label_settings
     #configure_face_samples
+  end
+
+  # Make sure our binaries actually work.
+  def configure_binary_paths
+    @convert_path = ((config[:imagemagick] || {})[:convert] || 'convert')
+    @identify_path = ((config[:imagemagick] || {})[:identify] || 'identify')
+    {'convert' => @convert_path, 'identify' => @identify_path}.each do |name, path|
+      if name != path and not File.exists?(path)
+        raise "Rixel::Config error - unable to find binary (#{name}) at: #{path}"
+      end
+      result = `#{Shellwords.escape(path)} -version`
+      unless result =~ /\AVersion: ImageMagick/
+        raise "Rixel::Config error - Unable to find valid ImageMagick #{name} binary#{path == name ? '' : " at #{path}"}"
+      end
+    end
   end
 
   # Configure ID length.
@@ -70,6 +116,65 @@ class Rixel::Config
       @url_builder = lambda {|id| @url.gsub(/:id/, id)}
     else
       raise "Rixel::Config error - Invalid URL format: #{url}"
+    end
+  end
+
+  # Configure maximum size of an image.
+  def configure_max_size
+    if config[:max_size].nil?
+      @max_width = 10000000000000000
+      @max_width = 10000000000000000
+      return
+     end
+    unless config[:max_size][:width].nil?
+      @max_width = config[:max_size][:width].to_i
+    end
+    unless config[:max_size][:height].nil?
+      @max_height = config[:max_size][:height].to_i
+    end
+  end
+
+  # Configure available fonts.
+  def configure_available_fonts
+    @available_fonts = []
+    ((config[:labels] || {})[:available_fonts] || []).each do |font|
+      @available_fonts.push(font) if font.is_a?(String)
+    end
+  end
+
+  # Configure label settings.
+  def configure_label_settings
+    @label_defaults = {}
+    ((config[:labels] || {})[:default] || {}).each do |key, value|
+      case key
+      when :size
+        unless "#{value}" =~ /\A\d+\Z/ and value.to_i >= 10 and value.to_i <= 100
+          raise "Rixel::Config error - Invalid label size, must be between 10 and 100"
+        end
+        @label_defaults[:size] = value.to_s.to_i
+      when :border_color
+        unless "#{value}" =~ COLOR_VALIDATOR
+          raise "Rixel::Config error - Invalid label border color, must be a known name, e.g. black, or a 3/6 character hex string"
+        end
+        @label_defaults[:border_color] = value.to_s
+      when :border_size
+        unless "#{value}" =~ /\A\d\Z/ and LABEL_BORDER_SIZE_VALUES.include?("#{value}".to_i)
+          raise "Rixel::Config error - Invalid border size, must be an integer between #{BORDER_SIZE_VALUES.first} and #{BORDER_SIZE_VALUES.last}"
+        end
+        @label_defaults[:border_size] = value.to_s.to_i
+      when :color
+        unless "#{value}" =~ COLOR_VALIDATOR
+          raise "Rixel::Config error - Invalid label color, must be a known name, e.g. black, or a 3/6 character hex string"
+        end
+        @label_defaults[:border_color] = value.to_s
+      when :font
+        unless @available_fonts.include?(value.to_s)
+          raise "Rixel::Config error - Default font is not listed in the available fonts"
+        end
+        @label_defaults[:font] = value.to_s
+      else
+        puts "Rixel::Config - skipping unknown label default key: #{key} => #{value.to_s}"
+      end
     end
   end
 
@@ -175,25 +280,6 @@ class Rixel::Config
   end
 
  private
-  # Symbolize keys.
-  def symbolize_keys(hash)
-    symbolized = {}
-    hash.each do |key, value|
-      if value.is_a?(Hash)
-        symbolized[key.to_sym] = symbolize_keys(value)
-      elsif value.is_a?(Array)
-        value.each do |item|
-          if item.is_a?(Hash)
-            item = symbolize_keys(item)
-          end
-        end
-      else
-        symbolized[key.to_sym] = value
-      end
-    end
-    symbolized
-  end
-
   # Get the current environment.
   def env
     return @env if @env

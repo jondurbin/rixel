@@ -1,2 +1,0 @@
-class Rixel
-end

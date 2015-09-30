@@ -8,6 +8,19 @@ class Rixel::Image::Face
   field :width, type: Integer
   field :height, type: Integer
 
+  # Belongs to an image.
+  belongs_to :image, class_name: 'Rixel::Image'
+
+  # As hash.
+  def to_hash
+    {
+      x: x,
+      y: y,
+      width: width,
+      height: height
+    }
+  end
+
   # Detect faces.
   def self.detect(path)
     @faces = []

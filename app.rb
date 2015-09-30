@@ -7,15 +7,34 @@ require 'getoptlong'
 require 'thread'
 require 'send_file'
 require 'open-uri'
+require 'shellwords'
+require 'autocode'
+require 'digest'
 #require 'opencv'
 
+# Symbolize keys helper.
+class Hash
+  def symbolize_keys
+    inject({}){|result, (key, value)|
+      new_key = case key
+      when String then key.to_sym
+      else key
+      end
+      new_value = case value
+      when Hash then value.symbolize_keys
+      else value
+      end
+      result[new_key] = new_value
+      result
+    }
+  end
+end
+
 # Rixel stuff.
-require_relative 'model/rixel'
-require_relative 'model/rixel/config'
-require_relative 'model/rixel/s3_interface'
-require_relative 'model/rixel/image'
-require_relative 'model/rixel/image/file'
-require_relative 'model/rixel/image/face'
+module Rixel
+  include AutoCode
+  auto_load true, :directories => [:model]
+end
 
 # Mongoid configuration.
 Mongoid.load!('config/mongoid.yml')
@@ -36,6 +55,21 @@ RixelServer = Cuba.define do
       @options[key.to_sym] = req[key] if "#{req[key]}" =~ /\A\d+\Z/
     end
     @options[:round] = true if "#{req['round']}".downcase == 'true'
+    if @options[:label].is_a?(String)
+      @options[:label_args] = [{text: @options[:label]}]
+    elsif @options[:label].is_a?(Hash)
+      @options[:label_args] = [@options[:label]]
+    elsif @options[:label].is_a?(Array)
+      @options[:label_args] = @options[:label].each.collect do |label|
+        if label.is_a?(String)
+          {text: label}
+        elsif label.is_a?(Hash)
+          label
+        else
+          nil
+         end
+      end.delete_if {|label| label.nil?}
+    end
     @options
   end
 
@@ -58,7 +92,7 @@ RixelServer = Cuba.define do
     on 'image' do
       on param('file') do |image|
         on image[:tempfile].is_a?(Tempfile) do
-          image = Rixel::Image.create_from_file(image[:tempfile].path) rescue nil
+          image = Rixel::Image.create_from_file(image[:tempfile].path, req['id'], options)
           on image.nil? do
             res.status = 422
             res.write 'Invalid image'
