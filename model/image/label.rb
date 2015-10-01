@@ -59,7 +59,7 @@ class Rixel::Image::Label
   end
 
   def validated_text
-    t = self.text.encode('UTF-8', :undef => :replace, :invalid => :replace, :replace => '').gsub(/\A\s+|\s+\Z|[\r\n]/, ' ').gsub(/[\x00-\x31]/, '') rescue ""
+    t = self.text.encode('UTF-8', :undef => :replace, :invalid => :replace, :replace => '') rescue nil
     if t.length > 100
       t = "#{t[0..100]}..."
     end
