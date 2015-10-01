@@ -159,7 +159,7 @@ class Rixel::Image
         "-fill #{label.color}",
         "-stroke #{label.border_color}",
         "-strokewidth #{label.border_size}",
-        "-annotate 0 '#{label.text}'"
+        "-annotate 0 #{label.text}"
       ].join(' ')
     end.join(' ')
     args = nil if args.empty?
