@@ -83,6 +83,8 @@ RixelServer = Cuba.define do
         halt(res.finish)
       end
       image = parent.get_or_create_variant(options)
+      res.headers["Content-Type"] = "image/png"
+      res.headers["Content-Disposition"] = "inline"
       send_file(image.get_file)
     end
     res.status = 404
