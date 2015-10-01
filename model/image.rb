@@ -247,7 +247,7 @@ class Rixel::Image
     if width.to_i > original.w
       raise 'Invalid size - requested width is greater than original'
     end
-    width.to_i / (original.w / original.h)
+    (width.to_i / (original.w.to_f / original.h.to_f)).to_i
   end
 
   # Calculate the width given a new height.
@@ -255,7 +255,7 @@ class Rixel::Image
     if height.to_i > original.h
       raise 'Invalid size - requested height is greater than original height'
     end
-    height.to_i * (original.w / original.h)
+    (height.to_i * (original.w.to_f / original.h.to_f)).to_i
   end
 
   # Find a variant.
