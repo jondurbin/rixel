@@ -71,6 +71,9 @@ RixelServer = Cuba.define do
          end
       end.delete_if {|label| label.nil?}
     end
+    @options[:labels].each do |args|
+      args.delete_if {|key, value| not Rixel::Image::Label::VALID_FIELDS.include?(key.to_sym)}
+    end
     @options
   end
 
@@ -85,7 +88,7 @@ RixelServer = Cuba.define do
       image = parent.get_or_create_variant(options)
       res.headers["Content-Type"] = "image/png"
       res.headers["Content-Disposition"] = "inline"
-      send_file(image.get_file)
+      res.write(image.get_file.read)
     end
     res.status = 404
   end
