@@ -37,7 +37,7 @@ class Rixel::Image
       {
         original: {
           convert_options: a.instance.generate_convert_options,
-          format: :png
+          format: a.instance.round ? :png : :jpg
         }
       }
     end
@@ -152,16 +152,19 @@ class Rixel::Image
   # Labels.
   def img_label_args
     args = labels.each.collect do |label|
-      [
-        "-pointsize #{label.size}",
-        "-gravity #{label.pos}",
-        "-font #{label.font}",
+      label_args = [
+        "-background transparent",
         "-fill #{label.color}",
+        "-font #{label.font}",
         "-stroke #{label.border_color}",
         "-strokewidth #{label.border_size}",
-        "-annotate 0 #{label.text}"
+        label.size.nil? ? '' : "-pointsize #{label.size}",
+        "-size #{w}x",
+        "-gravity center",
+        "caption:#{label.text}",
       ].join(' ')
-    end.join(' ')
+      "- | #{Shellwords.escape(Rixel::Config.convert_path)} #{label_args} - +swap -gravity #{label.pos} -composite"
+    end
     args = nil if args.empty?
     args
   end
@@ -233,7 +236,7 @@ class Rixel::Image
     end
 
     # Download from S3.
-    if Rixel::Config.s3?
+    if Rixel::Config.s3? and parent_id.nil?
       Rixel::S3Interface.download(id, path)
       return File.open(path)
     end

@@ -59,7 +59,7 @@ class Rixel::Image::Label
   end
 
   def validated_text
-    t = self.text.encode('UTF-8', :undef => :replace, :invalid => :replace, :replace => '').gsub(/[\r\n]/) {|t| ' '} rescue nil
+    t = self.text.encode('UTF-8', :undef => :replace, :invalid => :replace, :replace => '') rescue nil
     if t.length > 100
       t = "#{t[0..100]}..."
     end
@@ -83,10 +83,9 @@ class Rixel::Image::Label
 
   def validated_size
     if size.is_a?(Numeric) and size > 0 and size < 100
-      size
-    else
-      Rixel::Config.label_defaults[:size] || 30
+      return size
     end
+    Rixel::Config.label_defaults[:size]
   end
 
   def validated_position
