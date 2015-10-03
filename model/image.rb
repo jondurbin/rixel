@@ -62,7 +62,6 @@ class Rixel::Image
       }.merge(args.symbolize_keys)
       image = Rixel::Image.new(image_args)
       image.id = id unless id.nil?
-      image.save!
       image.image = File.open(path)
       begin
         image.save!
@@ -171,7 +170,7 @@ class Rixel::Image
 
   # Generate the style.
   def generate_convert_options
-    validate_args rescue nil
+    validate_args
     [
       size_args,
       offset_args,
@@ -273,7 +272,7 @@ class Rixel::Image
     variant = find_variant(options)
     if variant.nil?
       variant = Rixel::Image.new(options.merge(parent_id: id))
-      variant.save!
+      variant.validate_args
       variant.image = get_file
       variant.save!
       begin
@@ -317,14 +316,16 @@ class Rixel::Image
 
   def validated_height
     height = nil
-    if h.nil? and not w.nil?
+    if h.nil? and w.nil?
+      height = original.h
+    elsif h.nil? and not w.nil?
       if w.is_a?(Numeric) and w > 0 and w <= original.w
         height = height_for_width(w.to_i)
       end
     elsif h.is_a?(Numeric) or "#{h}" =~ /\A\d+(\.\d+)?\Z/
       height = "#{h}".to_i
     end
-    height = original.h unless height.is_a?(Integer) and height <= 0
+    height = original.h unless height.is_a?(Integer) or height <= 0
     height = [height, Rixel::Config.max_height].min
     height
   end
