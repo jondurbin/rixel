@@ -301,14 +301,16 @@ class Rixel::Image
   private
   def validated_width
     width = nil
-    if w.nil? and not h.nil?
+    if w.nil? and h.nil?
+      width = original.w
+    elsif w.nil? and not h.nil?
       if h.is_a?(Numeric) and h > 0 and h <= original.h
         width = width_for_height(h.to_i)
       end
     elsif w.is_a?(Numeric) or "#{w}" =~ /\A\d+(\.\d+)?\Z/
       width = "#{w}".to_i
     end
-    width = original.w unless width.is_a?(Integer) and width <= 0
+    width = original.w unless width.is_a?(Integer) or width <= 0
     width = [width, Rixel::Config.max_width].min
     width
   end
