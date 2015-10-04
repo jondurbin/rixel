@@ -38,7 +38,7 @@ class Rixel::Image
       {
         original: {
           convert_options: a.instance.generate_convert_options,
-          format: a.instance.format
+          format: a.instance.get_format
         }
       }
     end
@@ -108,6 +108,7 @@ class Rixel::Image
       x: x,
       y: y,
       round: round,
+      fmt: get_format,
       labels: labels.each.collect {|label| label.to_hash.sort}.sort
     }
   end
@@ -176,6 +177,7 @@ class Rixel::Image
       size_args,
       offset_args,
       crop_args,
+      "-strip",
       img_label_args,
       round_args
     ].delete_if {|arg| arg.nil?}.join(' ')
@@ -287,7 +289,7 @@ class Rixel::Image
   end
 
   # Image format.
-  def format
+  def get_format
     return :png if round
     f = fmt
     if f.is_a?(String)
@@ -296,7 +298,7 @@ class Rixel::Image
       f = nil unless ['gif', 'jpg', 'png', 'ico'].include?(f)
     end
     f ||= 'jpg'
-    return ":#{f}".to_sym
+    f
   end
 
   # Convert input args to validated args.
