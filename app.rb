@@ -55,6 +55,7 @@ RixelServer = Cuba.define do
     ['w', 'h', 'x', 'y', 'crop_x', 'crop_y'].each do |key|
       @options[key.to_sym] = req.params[key] if "#{req.params[key]}" =~ /\A\d+\Z/
     end
+    @options[:fmt] = req.params['fmt']
     @options[:round] = true if "#{req.params['round']}".downcase == 'true'
     if req.params['label'].is_a?(String)
       @options[:labels] = [{text: req.params['label']}]
