@@ -90,7 +90,11 @@ class Rixel::Image
       if Rixel::Config.s3? and Rixel::S3Interface.exists?(id)
         path = File.join(Rixel::Config.path, id)
         Rixel::S3Interface.download(id, path)
-        image = Rixel::Image.create_from_file(path, id, {downloaded: true})
+        format = 'jpg'
+        if id =~ /\.(jpe?g|png|gif|ico)$/
+          format = $1
+        end
+        image = Rixel::Image.create_from_file(path, id, {downloaded: true, fmt: format})
         return image
       end
       nil
@@ -127,7 +131,7 @@ class Rixel::Image
 
   # Size style.
   def size_args
-    "-resize '#{w}x#{h}^' -gravity center -extent #{w}x#{h}"
+    "-format PNG16 -colorspace RGB -background transparent -resize '#{w}x#{h}^' -gravity center -extent #{w}x#{h}"
   end
 
   # Round convert options.
@@ -135,7 +139,7 @@ class Rixel::Image
     return unless round
     diameter = [w, h].min
     radius = (diameter / 2).to_i
-    " - | #{Shellwords.escape(Rixel::Config.convert_path)} -resize '#{diameter}x#{diameter}^' -gravity center -extent #{diameter}x#{diameter} -size #{diameter}x#{diameter} xc:transparent -fill - -draw 'circle #{radius},#{radius} #{radius},0' +repage"
+    " - | #{Shellwords.escape(Rixel::Config.convert_path)} -background none -resize '#{diameter}x#{diameter}^' -gravity center -background none -extent #{diameter}x#{diameter} -size #{diameter}x#{diameter} xc:transparent -fill - -draw 'circle #{radius},#{radius} #{radius},0' +repage"
   end
 
   # Crop.
@@ -177,7 +181,6 @@ class Rixel::Image
       size_args,
       offset_args,
       crop_args,
-      "-strip",
       img_label_args,
       round_args
     ].delete_if {|arg| arg.nil?}.join(' ')
@@ -292,6 +295,11 @@ class Rixel::Image
   def get_format
     return :png if round
     f = fmt
+    if f.nil? or f.blank?
+      if original and original.id =~ /\.(png|jpe?g|gif|ico)$/i
+        f = $1
+      end
+    end
     if f.is_a?(String)
       f = f.downcase.strip
       f = 'jpg' if f == 'jpeg'
