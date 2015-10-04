@@ -6,7 +6,7 @@ class Rixel::Image
 
   auto_load true, :directories => ['model/image']
 
-  VALID_FIELDS = [:w, :h, :crop_x, :crop_y, :x, :y, :parent_id]
+  VALID_FIELDS = [:w, :h, :crop_x, :crop_y, :x, :y, :parent_id, :fmt]
 
   # Dimensions.
   field :w,  type: Integer
@@ -16,6 +16,7 @@ class Rixel::Image
   field :crop_y, type: Integer, default: 0
   field :x, type: Integer, default: 0
   field :y, type: Integer, default: 0
+  field :fmt, type: String, default: 'jpg'
   field :signature, type: String
   field :downloaded, type: Boolean, default: false
 
@@ -37,7 +38,7 @@ class Rixel::Image
       {
         original: {
           convert_options: a.instance.generate_convert_options,
-          format: a.instance.round ? :png : :jpg
+          format: a.instance.format
         }
       }
     end
@@ -285,6 +286,19 @@ class Rixel::Image
     variant
   end
 
+  # Image format.
+  def format
+    return :png if round
+    f = fmt
+    if f.is_a?(String)
+      f = f.downcase.strip
+      f = 'jpg' if f == 'jpeg'
+      f = nil unless ['gif', 'jpg', 'png', 'ico'].include?(f)
+    end
+    f ||= 'jpg'
+    return ":#{f}".to_sym
+  end
+
   # Convert input args to validated args.
   def validate_args
     self.w = validated_width
@@ -309,7 +323,7 @@ class Rixel::Image
     elsif w.is_a?(Numeric) or "#{w}" =~ /\A\d+(\.\d+)?\Z/
       width = "#{w}".to_i
     end
-    width = original.w unless width.is_a?(Integer) or width <= 0
+    width = original.w unless width.is_a?(Integer) and width > 0
     width = [width, Rixel::Config.max_width].min
     width
   end
@@ -325,7 +339,7 @@ class Rixel::Image
     elsif h.is_a?(Numeric) or "#{h}" =~ /\A\d+(\.\d+)?\Z/
       height = "#{h}".to_i
     end
-    height = original.h unless height.is_a?(Integer) or height <= 0
+    height = original.h unless height.is_a?(Integer) and height > 0
     height = [height, Rixel::Config.max_height].min
     height
   end
