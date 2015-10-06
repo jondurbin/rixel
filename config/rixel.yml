@@ -1,4 +1,5 @@
 production:
+  image_endpoint: images/(.+)\/?\z
   url: /images/:id
   storage:
     path: /rixel-drop
