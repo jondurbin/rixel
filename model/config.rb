@@ -11,6 +11,9 @@ class Rixel::Config
     def url
       config.url
     end
+    def image_endpoint
+      config.image_endpoint
+    end
     def id_length
       config.id_length
     end
@@ -59,6 +62,7 @@ class Rixel::Config
   end
 
   attr_reader :url              # URL format.
+  attr_reader :image_endpoint   # Full URL endpoint with ID regex.
   attr_reader :id_length        # Number of characters to use for the ID length.
   attr_reader :s3               # S3 enabled?
   attr_reader :path             # Folder for storing images locally.
@@ -82,6 +86,7 @@ class Rixel::Config
     configure_binary_paths
     configure_id_length
     configure_url_format
+    configure_image_endpoint
     configure_storage
     configure_max_size
     configure_available_fonts
@@ -129,6 +134,16 @@ class Rixel::Config
       raise "Rixel::Config error - Invalid URL format: #{url}"
     end
   end
+
+  # Configure the ID pattern.
+  def configure_image_endpoint
+    pattern = config[:image_endpoint]
+    pattern ||= '([^\\/]+)'
+    @image_endpoint = Regexp.new(pattern)
+puts "Image endpoint: #{@image_endpoint}"
+  rescue => e
+    raise "Rixel::Config error - Invalid image endpoint (pattern): #{e}"
+  end 
 
   # Configure maximum size of an image.
   def configure_max_size
