@@ -363,22 +363,25 @@ class Rixel::Image
       width = "#{w}".to_i
     end
     width = original.w unless width.is_a?(Integer) and width > 0
+    width = [width, original.w].min
     width = [width, Rixel::Config.max_width].min
     width
   end
 
   def validated_height
     height = nil
-    if h.nil? and w.nil?
+    if self.h.nil? and self.w.nil?
       height = original.h
-    elsif h.nil? and not w.nil?
-      if w.is_a?(Numeric) and w > 0 and w <= original.w
-        height = height_for_width(w.to_i)
+    elsif self.h.nil? and not self.w.nil?
+      if self.w.is_a?(Numeric) and self.w > 0 and self.w <= original.w
+        height = height_for_width(self.w.to_i)
+        puts "Calculated height: #{height} for width: #{self.w.to_i}"
       end
-    elsif h.is_a?(Numeric) or "#{h}" =~ /\A\d+(\.\d+)?\Z/
-      height = "#{h}".to_i
+    elsif self.h.is_a?(Numeric) or "#{self.h}" =~ /\A\d+(\.\d+)?\Z/
+      height = "#{self.h}".to_i
     end
     height = original.h unless height.is_a?(Integer) and height > 0
+    height = [height, original.h].min
     height = [height, Rixel::Config.max_height].min
     height
   end
