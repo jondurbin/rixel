@@ -19,6 +19,7 @@ class Rixel::Image
   field :fmt, type: String, default: 'jpg'
   field :signature, type: String
   field :downloaded, type: Boolean, default: false
+  field :optimized, type: Boolean, default: false
 
   # Options.
   field :round, type: Boolean, default: false
@@ -91,7 +92,7 @@ class Rixel::Image
         path = File.join(Rixel::Config.path, id)
         Rixel::S3Interface.download(id, path)
         format = 'jpg'
-        if id =~ /\.(jpe?g|png|gif|ico)$/
+        if id =~ /\.(jpe?g|png|gif)$/
           format = $1
         end
         image = Rixel::Image.create_from_file(path, id, {downloaded: true, fmt: format})
@@ -178,6 +179,7 @@ class Rixel::Image
   def generate_convert_options
     validate_args
     [
+      "-strip",
       size_args,
       offset_args,
       crop_args,
@@ -232,17 +234,31 @@ class Rixel::Image
     @original
   end
 
+  # Optimize jpegs.
+  def ensure_optimized(path)
+    return if optimized or Rixel::Config.imgmin_path.nil? or get_format != 'jpg'
+    optimized_path = Tempfile.new('optimize').path
+    rv = system("#{Shellwords.escape(Rixel::Config.imgmin_path)} #{Shellwords.escape(path)} #{optimized_path}")
+    if rv === true
+      File.unlink(path)
+      File.rename(optimized_path, path)
+      update_attributes!(optimized: true)
+    end
+  end
+
   # File.
   def get_file
     # Stored locally?
     path = File.join(Rixel::Config.path, id)
     if File.exists?(path)
+      ensure_optimized(path)
       return File.open(path)
     end
 
     # Download from S3.
     if Rixel::Config.s3? and parent_id.nil?
       Rixel::S3Interface.download(id, path)
+      ensure_optimized(path)
       return File.open(path)
     end
 
@@ -293,17 +309,17 @@ class Rixel::Image
 
   # Image format.
   def get_format
-    return :png if round
+    return 'png' if round
     f = fmt
     if f.nil? or f.blank?
-      if original and original.id =~ /\.(png|jpe?g|gif|ico)$/i
+      if original and original.id =~ /\.(png|jpe?g|gif)$/i
         f = $1
       end
     end
     if f.is_a?(String)
       f = f.downcase.strip
       f = 'jpg' if f == 'jpeg'
-      f = nil unless ['gif', 'jpg', 'png', 'ico'].include?(f)
+      f = nil unless ['gif', 'jpg', 'png'].include?(f)
     end
     f ||= 'jpg'
     f

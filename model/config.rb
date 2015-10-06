@@ -53,6 +53,9 @@ class Rixel::Config
     def identify_path
       config.identify_path
     end
+    def imgmin_path
+      config.imgmin_path
+    end
   end
 
   attr_reader :url              # URL format.
@@ -70,6 +73,7 @@ class Rixel::Config
   attr_reader :max_height       # Maximum height of an image.
   attr_reader :convert_path     # Path to the convert binary.
   attr_reader :identify_path    # Path to the identify binary.
+  attr_reader :imgmin_path      # Path to imgmin.
 
   # Create a new Rixel configuration.
   def initialize(path)
@@ -96,6 +100,13 @@ class Rixel::Config
       result = `#{Shellwords.escape(path)} -version`
       unless result =~ /\AVersion: ImageMagick/
         raise "Rixel::Config error - Unable to find valid ImageMagick #{name} binary#{path == name ? '' : " at #{path}"}"
+      end
+    end
+    @imgmin_path = config[:imgmin_path]
+    unless @imgmin_path.nil?
+      result = system("#{Shellwords.escape(@imgmin_path)}")
+      if result.nil?
+        raise "Rixel::Config error - Unable to execute imgmin with path: #{@imgmin_path}"
       end
     end
   end
