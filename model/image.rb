@@ -243,6 +243,10 @@ class Rixel::Image
       File.unlink(path)
       File.rename(optimized_path, path)
       update_attributes!(optimized: true)
+    else
+      if File.exists?(optimized_path)
+        File.unlink(optimized_path) rescue nil
+      end
     end
   end
 
