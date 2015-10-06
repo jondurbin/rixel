@@ -40,9 +40,6 @@ end
 # Mongoid configuration.
 Mongoid.load!('config/mongoid.yml')
 
-# Rixel configuration.
-image_endpoint = Rixel::Config.url.gsub(/^\//, '')
-
 # Cuba configuration.
 Cuba.plugin(SendFile)
 
@@ -81,7 +78,7 @@ RixelServer = Cuba.define do
 
   # Get an image.
   on get do
-    on image_endpoint do |id|
+    on Rixel::Config.image_endpoint do |id|
       parent = Rixel::Image.load(id)
       on parent.nil? do
         res.status = 404
