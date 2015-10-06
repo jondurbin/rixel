@@ -45,9 +45,10 @@ production:
     available_fonts:
       - Impact
       - Times
-    imagemagick:
-      convert: /usr/local/bin/convert
-      identify: /usr/local/bin/identify
+  imagemagick:
+    convert: /usr/local/bin/convert
+    identify: /usr/local/bin/identify
+  imgmin_path: /usr/local/bin/imgmin
 ```
 #### Description
 1. url: The path used for serving images, e.g. /path/to/image/:id
@@ -55,6 +56,7 @@ production:
 3. storage.path: Path to local storage (serves as cache directory when using S3)
 4. storage.s3: AWS S3 configuration
 5. storage.s3.cache: Configure how many files and/or max size of the local cache directory.
+6. imgmin_path: If you have imgmin installed (https://github.com/rflynn/imgmin), will automatically attempt to optimize jpg images.
 
 ## Running the server
 ```bash
