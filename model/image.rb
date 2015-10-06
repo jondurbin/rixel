@@ -31,6 +31,9 @@ class Rixel::Image
   # Make sure there's room for images when loading.
   before_create :make_room
 
+  # Remove variants when a master image is removed.
+  before_destroy :remove_variants
+
   # Attached image.
   has_mongoid_attached_file(:image, {
     path: "#{Rixel::Config.path}/:id",
@@ -201,6 +204,12 @@ class Rixel::Image
     return unless Rixel::Config.s3?
     return unless parent_id.nil?
     Rixel::S3Interface.delete(id)
+  end
+
+  # Remove variant images on destroy.
+  def remove_variants
+    return unless parent_id.nil?
+    Rixel::Image.destroy_all(parent_id: id)
   end
 
   # Get the total size.
