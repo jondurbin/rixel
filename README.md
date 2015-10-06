@@ -21,6 +21,7 @@ Rixel is a ruby web-server which servers as an image proxy that can transform im
 ### Rixel config
 ```yaml
 production:
+  image_endpoint: images/(.+)\/?\z
   url: /images/:id
   storage:
     path: /rixel-drop
@@ -57,6 +58,7 @@ production:
 4. storage.s3: AWS S3 configuration
 5. storage.s3.cache: Configure how many files and/or max size of the local cache directory.
 6. imgmin_path: If you have imgmin installed (https://github.com/rflynn/imgmin), will automatically attempt to optimize jpg images.
+7. image_endpoint: The URL format to use for loading images.  The image ID will be based on the captured substring.
 
 ## Running the server
 ```bash
