@@ -24,6 +24,7 @@ production:
     available_fonts:
       - Impact
       - Times
-    imagemagick:
-      convert: /usr/local/bin/convert
-      identify: /usr/local/bin/identify
+  imagemagick:
+    convert: /usr/local/bin/convert
+    identify: /usr/local/bin/identify
+  imgmin_path: /usr/local/bin/imgmin
