@@ -11,7 +11,9 @@ class Rixel::S3Interface
     def download(id, output_path)
       log(id, "Download")
       File.open(output_path, 'wb') do |output|
-        output.write(bucket.objects[path_for(id)].read)
+        bucket.objects[path_for(id)].read do |chunk|
+          output.write(chunk)
+        end
       end
     end
 
