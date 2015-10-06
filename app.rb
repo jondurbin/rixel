@@ -88,7 +88,7 @@ RixelServer = Cuba.define do
         halt(res.finish)
       end
       image = parent.get_or_create_variant(options)
-      res.headers["Content-Type"] = "image/png"
+      res.headers["Content-Type"] = "image/#{image.get_format}"
       res.headers["Content-Disposition"] = "inline"
       res.headers["Expires"] = Time.at(Time.now + 60 * 60 * 24 * 30).strftime("%a, %d %b %Y %H:%M:%S GMT")
       res.write(image.get_file.read)
