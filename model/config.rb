@@ -149,7 +149,7 @@ puts "Image endpoint: #{@image_endpoint}"
   def configure_max_size
     if config[:max_size].nil?
       @max_width = 10000000000000000
-      @max_width = 10000000000000000
+      @max_height = 10000000000000000
       return
      end
     unless config[:max_size][:width].nil?
