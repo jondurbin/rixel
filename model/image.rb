@@ -92,7 +92,7 @@ class Rixel::Image
 
       # (Try) to download from s3.
       if Rixel::Config.s3? and Rixel::S3Interface.exists?(id)
-        path = File.join(Rixel::Config.path, Shellwords.escape(id.to_s).gsub('/', '::slash::'))
+        path = File.join(Rixel::Config.path, Shellwords.escape(id.to_s).gsub('/', '::'))
         Rixel::S3Interface.download(id, path)
         format = 'jpg'
         if id =~ /\.(jpe?g|png|gif)$/
@@ -262,7 +262,7 @@ class Rixel::Image
   # File.
   def get_file
     # Stored locally?
-    path = File.join(Rixel::Config.path, Shellwords.escape(id.to_s).gsub('/', '::slash::'))
+    path = File.join(Rixel::Config.path, Shellwords.escape(id.to_s).gsub('/', '::'))
     if File.exists?(path)
       ensure_optimized(path)
       return File.open(path)
